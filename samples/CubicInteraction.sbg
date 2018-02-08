@@ -1,0 +1,295 @@
+<?xml version="1.0"?><Project TYPE="3D Lattices"><Size><![CDATA[16]]></Size><GridType><![CDATA[Cubic]]></GridType><Simulation><![CDATA[import static simbigraph.grid.model.Snippet._f2;
+import static simbigraph.grid.model.Snippet._f3;
+import static simbigraph.grid.model.Snippet.k_padding;
+import static simbigraph.grid.model.Snippet.mass1;
+import static simbigraph.grid.model.Snippet.mass2;
+
+import java.awt.Color;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.collections15.Factory;
+
+import simbigraph.core.Context;
+import simbigraph.core.Simulation;
+import simbigraph.engine.SimState;
+import simbigraph.grid.model.CellAccessor;
+import simbigraph.grid.model.Grid;
+import simbigraph.grid.model.GridPoint;
+import simbigraph.grid.model.MultiOccupancyCellAccessor;
+import simbigraph.math.RandomHelper;
+
+/**
+ * 
+ * @author Eugene Eudene
+ * 
+ 
+ */
+public class Simulation0 extends Simulation {
+	
+	public class SimgraphNode {
+
+	}
+	class FeEl extends SimgraphNode {
+		public Color color = Color.BLUE;
+
+		public Color getColor() {
+			return color;
+		}
+	}
+
+	class PtEl extends SimgraphNode {
+		public Color color = Color.GREEN;
+
+		public Color getColor() {
+			return color;
+		}
+	}
+	class PaddingAgent extends SimgraphNode{
+		public Color color=Color.RED;
+
+		public PaddingAgent() {
+			super();
+		}
+		
+
+	}
+	class Marker extends SimgraphNode{
+		public Color color=Color.YELLOW;
+
+		public Marker() {
+			super();
+		}
+	}
+	final double K = (1.602176530 / 1.3806505) * 10000.0;
+	double T = 300.0;
+	List<FeEl> feSet = new ArrayList();
+	List<PtEl> ptSet = new ArrayList();
+	Grid<SimgraphNode> grid;
+	CellAccessor<SimgraphNode, Map<GridPoint, Object>> accessor = new MultiOccupancyCellAccessor<SimgraphNode>();
+
+	private Grid<SimgraphNode> doOktadron() {
+		// Abstract3DPanel.updateList.clear();
+		
+		Grid grid=Context.getGrid();
+		//Context.setGrid(new DefaultGrid(new WrapAroundBorders(),
+		//		new MultiOccupancyCellAccessor(), 16, 16, 16));
+		int xdim = grid.getDimensions().getWidth();
+		int ydim = grid.getDimensions().getHeight();
+		int zdim = grid.getDimensions().getDepth();
+		double f_probe = 0.5;
+		double s_probe = 0.5;
+		int elem_height=4;
+		int elem_depth=8;
+
+		
+		for (int i = 0; i < xdim; i++)
+			for (int j = 0; j < ydim; j++)
+				for (int k = 0; k < zdim-1; k++) {
+					SimgraphNode agent = null;
+					double rand = RandomHelper.getUniform().nextDoubleFromTo(
+							0.0d, 1.0d);
+					//if ((f_probe + s_probe) <= 1) 
+					{
+						if ((j < ydim - elem_height) && (j > elem_height) && (i < xdim - elem_height)
+								&& (i > elem_height) && (k < (zdim - elem_depth)) && (k >0)) 						{
+							if (rand < (f_probe))
+							//1f (true)
+							//if (rand<0.5)
+								{agent = new PtEl();ptSet.add((PtEl) agent);
+}
+							
+							//else if (true)
+							else if (rand < (f_probe + s_probe))
+								{agent = new FeEl();feSet.add((FeEl) agent);
+}
+							else
+								agent = new Marker();
+						} else if (k == 0) {
+							//agent = new Marker(i, j, k);
+							agent = new PaddingAgent();
+
+						} else
+							agent = new Marker();
+						grid.moveTo(agent, i, j, k);
+					}
+				}
+
+		return grid;
+	}
+
+	public void step(SimState state) {
+	
+		SimgraphNode feEl;
+		SimgraphNode ptEl;
+		double p = 0;
+		do {
+			feEl = feSet.get(simbigraph.math.RandomHelper.getUniform()
+					.nextIntFromTo(0, feSet.size() - 1));
+			ptEl = ptSet.get(simbigraph.math.RandomHelper.getUniform()
+					.nextIntFromTo(0, ptSet.size() - 1));
+
+			double d_e;
+			d_e = FindEnergy(feEl, ptEl);
+			if ((d_e) > 0) {
+				double step = -(d_e) * K / T;
+				p = Math.exp(step);
+			} else
+				p = 0.0;
+
+		} while (RandomHelper.getUniform().nextDoubleFromTo(0.0d, 1.0d) > p);
+
+		GridPoint fe_loc = grid.getLocation(feEl);
+		GridPoint pt_loc = grid.getLocation(ptEl);
+
+		grid.moveTo(feEl, pt_loc.getX(), pt_loc.getY(), pt_loc.getZ());
+		grid.moveTo(ptEl, fe_loc.getX(), fe_loc.getY(), fe_loc.getZ());
+		// MainGrid3D.addToUpdateList(feEl);
+		// MainGrid3D.addToUpdateList(ptEl);
+	}
+
+	private double FindEnergy(SimgraphNode feEl, SimgraphNode ptEl) {
+		double de = 0.0, e1 = 0.0, e2 = 0.0;
+		e1 = findE(feEl, ptEl);
+		GridPoint fe_loc = grid.getLocation(feEl);
+		GridPoint pt_loc = grid.getLocation(ptEl);
+		grid.moveTo(feEl, pt_loc.getX(), pt_loc.getY(), pt_loc.getZ());
+		grid.moveTo(ptEl, fe_loc.getX(), fe_loc.getY(), fe_loc.getZ());
+		e2 = findE(feEl, ptEl);
+		fe_loc = grid.getLocation(feEl);
+		pt_loc = grid.getLocation(ptEl);
+		grid.moveTo(feEl, pt_loc.getX(), pt_loc.getY(), pt_loc.getZ());
+		grid.moveTo(ptEl, fe_loc.getX(), fe_loc.getY(), fe_loc.getZ());
+		de = e2 - e1;
+		return de;
+	}
+
+	private double findE(SimgraphNode a1, SimgraphNode a2) {
+		int[] m_el1 = countElem(_f2, a1);
+		int[] m_el2 = countElem(_f3, a1);
+		// int[] m_el3 = countElem(_f4, a1);
+		// int[] m_el4 = countElem(_f5, a1);
+		// int[] m_el5 = countElem(_f6, a1);
+		// int[] m_el6 = countElem(_f7, a1);
+		int koef = 0, koef2 = 0;// fe=1 pt=0
+		if (a1 instanceof FeEl)
+			koef = 1;
+		if (a2 instanceof PtEl)
+			koef2 = 1;
+
+		double e1 = m_el1[0] * mass1[0][koef] // + mass2[0][koef] * m_el2[0]
+				// + mass3[0][koef] * m_el3[0] + mass4[0][koef] * m_el4[0]
+				// + mass5[0][koef] * m_el5[0] + mass6[0][koef] * m_el6[0]
+				+ m_el1[1] * mass1[1][koef] + mass2[1][koef] * m_el2[1]// +
+																		// mass3[1][koef]
+																		// *
+																		// m_el3[1]
+																		// +
+																		// mass4[1][koef]
+																		// *
+																		// m_el4[1]
+		// + mass5[1][koef] * m_el5[1] + mass6[1][koef] * m_el6[1]
+		 + k_padding[koef] * (m_el1[2]);
+		// + k_padding[koef] * (m_el1[2] + m_el2[2] + m_el3[2]);
+
+		int[] _m_el1 = countElem(_f2, a2);
+		int[] _m_el2 = countElem(_f3, a2);
+		// int[] _m_el3 = countElem(_f4, a2);
+		// int[] _m_el4 = countElem(_f5, a2);
+		// int[] _m_el5 = countElem(_f6, a2);
+		// int[] _m_el6 = countElem(_f7, a2);
+
+		double e2 = _m_el1[0] * mass1[0][koef2] + mass2[0][koef2] * _m_el2[0]
+		// + mass3[0][koef2] * _m_el3[0] + mass4[0][koef2] * _m_el4[0]
+		// + mass5[0][koef2] * _m_el5[0] + mass6[0][koef2] * _m_el6[0]
+				+ _m_el1[1] * mass1[1][koef2] + mass2[1][koef2] * _m_el2[1]// +
+																			// mass3[1][koef2]
+																			// *
+																			// _m_el3[1]
+																			// +
+																			// mass4[1][koef2]
+																			// *
+																			// _m_el4[1]
+		// + mass5[1][koef2] * _m_el5[1] + mass6[1][koef2] * _m_el6[1]
+		 + k_padding[koef2]*(_m_el1[2]+ _m_el2[2]);
+		// + k_padding[koef2] * (_m_el1[2]);
+		return (e1 + e2);
+	}
+
+	int[] countElem(int[][] mass, SimgraphNode agent1) {
+		int Pt = 0;
+		int Fe = 0;
+		int Pad = 0;
+		int Dump = 0;
+		int[] m_el = new int[4];
+		GridPoint loc = grid.getLocation(agent1);
+		for (int k = 0; k < mass.length; k++) {
+			int x1 = loc.getX() + mass[k][0];
+			int y1 = loc.getY() + mass[k][1];
+			int z1 = loc.getZ() + mass[k][2];
+			SimgraphNode simgraphNode = grid.getRandomObjectAt(x1, y1, z1);
+			if (simgraphNode instanceof PtEl)
+				Pt++;
+			else if (simgraphNode instanceof FeEl)
+				Fe++;
+		}
+		m_el[0] = Pt;
+		m_el[1] = Fe;
+		m_el[2] = Pad;
+		m_el[3] = Dump;
+
+		return m_el;
+
+	}
+
+	public void start() {
+		super.start();
+		schedule.scheduleRepeating(this);
+
+	
+	}
+
+	@Override
+	public Class[] getVisClass() {
+		return null;
+	}
+
+	@Override
+	public void init(Object env) {
+		grid = Context.getGrid();
+		doOktadron();
+
+	}
+
+	@Override
+	public Factory getAgentFactory() {
+		return new Factory<FeEl>() {
+			@Override
+			public FeEl create() {
+				return new FeEl();
+			}
+		};
+	}
+
+	@Override
+	public Color getAgentColor(Object obj) {
+		Color col = Color.GREEN;
+		if (obj instanceof FeEl)
+			return Color.BLUE;
+		if (obj instanceof PtEl)
+			return Color.RED;
+		if (obj instanceof Marker)
+			return Color.GRAY;
+		if (obj instanceof PaddingAgent)
+			return Color.CYAN;
+		return col;
+	}
+	//---------------------------------------
+	@Override
+	public boolean isVisible(Object obj) {
+		if(obj instanceof Marker) return false;
+		else return true;
+	}
+
+}]]></Simulation></Project>

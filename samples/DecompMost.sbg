@@ -1,0 +1,27 @@
+<?xml version="1.0"?><Project TYPE="ProjGraphDecomposition"><EvolvSteps><![CDATA[1]]></EvolvSteps><Source><![CDATA[Alone Vertex]]></Source><FileName><![CDATA[]]></FileName><DecompItems><![CDATA[1.0
+<?xml version="1.0" encoding="UTF-8"?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns/graphml"
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"  
+xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns/graphml">
+<key id="state" for="node"/>
+<graph edgedefault="directed">
+<node id="1">
+<data key="state">bla</data>
+</node>
+<node id="0">
+<data key="state">beg</data>
+</node>
+<node id="3">
+<data key="state">end</data>
+</node>
+<node id="2">
+<data key="state">bla</data>
+</node>
+<edge directed="false" source="0" target="1"/>
+<edge directed="false" source="2" target="3"/>
+<edge directed="false" source="0" target="2"/>
+<edge directed="false" source="1" target="2"/>
+<edge directed="false" source="1" target="3"/>
+</graph>
+</graphml>
+]]></DecompItems><but><![CDATA[]]></but></Project>

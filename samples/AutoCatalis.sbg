@@ -1,0 +1,238 @@
+<?xml version="1.0"?><Project TYPE="2D Lattices"><Size><![CDATA[45]]></Size><GridType><![CDATA[Square]]></GridType><Simulation><![CDATA[import java.awt.Color;
+import java.util.Map;
+
+import org.apache.commons.collections15.Factory;
+
+import simbigraph.core.Context;
+import simbigraph.core.Simulation;
+import simbigraph.engine.SimState;
+import simbigraph.grid.model.CellAccessor;
+import simbigraph.grid.model.Grid;
+import simbigraph.grid.model.GridDimensions;
+import simbigraph.grid.model.GridPoint;
+import simbigraph.grid.model.MultiOccupancyCellAccessor;
+
+
+/**
+ * Each reactor is connected to its neighbors in a 2D von Neuman neighborhood.  
+ * The cubic autocatalytic reaction for a single species is
+ *           
+ *    R + 2P -> 3P
+ *         
+ *         P -> D
+ *  
+ * where R is the resource, P is the species, and D is a dead (inert species),
+ * with corresponding growth and death rates.  See
+ *   
+ *  Tatara, E., I. Birol, F. Teymour, and A. Cinar, Static and Dynamic Behavior
+ *   of Autocatalytic Replicators in Reactor Networks, Industrial and Engineering
+ *   Chemistry Research, 43, 3972-3993, 2004.
+ *   
+ * for a full description of the model.  The dimensionless ODEs for R and P are:
+ *   
+ *    dr
+ *    --  = -krp^2 + f(1-r) + g(r_up + r_down + r_left + r_right - 4r)
+ *    dt
+ *  
+ *    dp
+ *    --  = krp^2 - p(f+d) + g(p_up + p_down + p_left + p_right - 4p) 
+ *    dt
+ *  
+ * where k is the growth rate, d is the death rate, f is the flow rate, and
+ * g is the interconnection flow rate between neighbors. 
+ *  
+ * The ODEs are solved numerically using forward Euler integration, which 
+ * provides a simple and efficient solution, although is not necessarily 
+ * physically realistic considering that the model is highly nonlinear.
+ * 
+ * Note that the model behavior is highly sensitive to the parameters.  
+ * Experiment with different values for the flow rates and kinetics, but start 
+ * off with small differences from the default values.  The integration time
+ * step may also need to be changed for some regimes.
+ *  
+ * @author Eric Tatara
+ * @author Nick Chernov
+ * @author Eugene Eudene
+ */
+
+public class Simulation0 extends Simulation {
+	
+	double flow = 0.0048;
+	double interaction = 0.01;
+	double growthRate = 2.15;
+	double deathRate = 0.03125;
+	double initialSpecies = 0.25;
+	double baseResource = 1.0;
+	
+	
+	class Reactor {
+
+		public double resource; // the resource concentration
+		public double species;  // the species concentration
+
+		public double t_resource; // the resource concentration
+		public double t_species;  // the species concentration
+
+	
+		public static final double delta = 0.5; // integration time step
+		
+		public Reactor(){
+			resource = 1.0;   // initially 1 for all reactors
+			species  = 0.0;   // initially 0 for all reactors
+		}
+		
+		/**
+		 * The step method updates the reactor states for the given interval
+		 */
+		public void step(){
+			Grid<Reactor> grid = Context.getGrid();
+
+			double neighborResource = 0;
+			double neighborSpecies = 0;
+			
+			GridPoint location = grid.getLocation(this);
+			
+			neighborResource += ( (Reactor) grid.getObjectAt(location.getX()+1,location.getY())).getResource();
+			neighborResource += ( (Reactor) grid.getObjectAt(location.getX(),location.getY()+1)).getResource();
+			neighborResource += ((Reactor) grid.getObjectAt(location.getX()-1,location.getY())).getResource();
+			neighborResource += ((Reactor) grid.getObjectAt(location.getX(),location.getY()-1)).getResource();
+			
+			neighborSpecies += ((Reactor) grid.getObjectAt(location.getX()+1,location.getY())).getSpecies();
+			neighborSpecies += ((Reactor) grid.getObjectAt(location.getX(),location.getY()+1)).getSpecies();
+			neighborSpecies += ((Reactor) grid.getObjectAt(location.getX()-1,location.getY())).getSpecies();
+			neighborSpecies += ((Reactor) grid.getObjectAt(location.getX(),location.getY()-1)).getSpecies();
+			
+			// Solve for resource concentration
+			double r = -growthRate * resource * Math.pow(species,2) 
+			              + flow * (1 - resource) 
+			              + interaction * (neighborResource - 4 * resource);
+			
+			t_resource = r * delta + resource;
+			
+			// solve for species concentration
+			double p =  growthRate * resource * Math.pow(species,2) 
+	                  - species * (deathRate + flow) 
+	                  + interaction * (neighborSpecies - 4 * species);
+			
+			
+			t_species  = p * delta + species;
+			
+		}
+		
+		public double getResource() {
+			return resource;
+		}
+
+		public void setResource(double resource) {
+			this.resource = resource;
+		}
+
+		public double getSpecies() {
+			return species;
+		}
+
+		public void setSpecies(double species) {
+			this.species = species;
+		}
+
+		public void applyChange() {
+			species=t_species;
+			resource=t_resource;
+		}
+	}
+	CellAccessor<Object, Map<GridPoint, Object>> accessor = new MultiOccupancyCellAccessor<Object>();
+
+	private void doStructure() {
+		Grid grid = Context.getGrid();
+		GridDimensions dim = grid.getDimensions();
+		
+		for (int i = 0; i < dim.getWidth(); i++)
+			for (int j = 0; j < dim.getHeight(); j++) {
+				Reactor cell = new Reactor();
+				grid.moveTo(cell, i, j);
+		}
+	    ((Reactor)grid.getObjectAt((int)(dim.getWidth()/2),(int)(dim.getHeight()/2))).setSpecies(0.25);
+
+		
+		return;
+	}
+
+	// -----------------------------------------------------------------------
+
+	public void step(SimState state) {
+		//
+		double a=0,b=0;
+		Grid grid = Context.getGrid();
+		GridDimensions dim = grid.getDimensions();
+		double maxres=0, maxpiess=0;
+
+		for (int i = 0; i < dim.getDimension(0); i++) {
+			for (int j = 0; j < dim.getDimension(1); j++) {
+				Reactor ca = (Reactor) grid.getObjectAt(i,j);
+				ca.step();
+				a+=ca.t_resource;
+				b+=ca.t_species;
+				if(maxres<=ca.t_resource)maxres=ca.t_resource;
+				if(maxpiess<ca.t_species)maxpiess=ca.t_species;
+
+			}
+		}
+
+		for (int i = 0; i < dim.getDimension(0); i++) {
+			for (int j = 0; j < dim.getDimension(1); j++) {
+				Reactor ca = (Reactor) grid.getObjectAt(i,j);
+				ca.applyChange();
+			}
+		}
+	}
+
+	public void start() {
+		super.start();
+		schedule.scheduleRepeating(this);	
+	}
+
+	@Override
+	public void init(Object env) {
+		doStructure();
+		System.out.println(getTheoreticMaxSpecies(initialSpecies));
+	}
+
+	@Override
+	public Color getAgentColor(Object obj) {
+		
+		double maxBorder = getTheoreticMaxSpecies(initialSpecies);
+		double step = maxBorder/256;
+		Reactor o = (Reactor)obj;
+		double currentSpecies = o.species;
+		int colorValue=0;	
+			for (int k=0; k<255; k++)
+			{
+				if (currentSpecies>=k*step && currentSpecies<=(k+1)*step)
+						{
+							colorValue = k;
+							break;	
+						}
+		
+			}
+		Color c = new Color (255-colorValue,100,colorValue);
+		return c;
+	}
+	public double getTheoreticMaxSpecies(double StartSpec)
+	{
+		double res = 1.0;
+		double fMax = 0.0;
+		fMax = (growthRate*res*4*StartSpec)/2 - 4*StartSpec*(deathRate+flow+4*interaction)+interaction*4*StartSpec; 
+
+		fMax =(growthRate*res*fMax)/2 - fMax*(deathRate+flow+4*interaction)+interaction*fMax;
+			
+		return fMax;													
+
+									
+		
+	}
+	@Override
+	public Factory getAgentFactory() {
+		return null;
+	}
+
+}]]></Simulation></Project>
